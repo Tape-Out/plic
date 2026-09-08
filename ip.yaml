@@ -31,9 +31,7 @@ params:
     range:
     - 1
     - 32
-    desc: >-
-      中断源数。上限 32 是寄存器图定的——pending 与 enable 各只有一个 32 位字。
-      要撑到 PLIC 规范的 1023 源，得把这两个寄存器改成多字数组，
+    desc: 中断源数。上限 32 是寄存器图定的——pending 与 enable 各只有一个 32 位字。 要撑到 PLIC 规范的 1023 源，得把这两个寄存器改成多字数组，
       那是软件可见的接口变更，不是实现里补一刀能了的。
   contexts:
     type: int
@@ -61,35 +59,35 @@ deps:
 area:
   base:
     points:
-      '4': 1661.24
-      '8': 2251.2
-      '16': 3432.8
-      '32': 5844.72
+      '4': 1634.36
+      '8': 2252.88
+      '16': 3468.64
+      '32': 6028.96
     per: sources
-  margin: 0.0077
+  margin: 0.0241
   model: points-additive
   error:
-    bound: 0.028
+    bound: 0.104
     sign: over
     note: parameter curves stored as measured points, features added on top, then
-      lifted by 0.0077 so that no untested combination predicts under; the worst came
-      in 0.27 percent under before the lift
+      lifted by 0.0241 so that no untested combination predicts under; the worst came
+      in 1.91 percent under before the lift
   measured:
   - at:
       sources: 4
-    um2: 1661.24
+    um2: 1634.36
   - at:
       sources: 8
-    um2: 2251.2
+    um2: 2252.88
   - at:
       sources: 16
-    um2: 3432.8
+    um2: 3468.64
   - at:
       sources: 32
-    um2: 5844.72
+    um2: 6028.96
   corner:
     tool: ecc
     pdk: ics55
     freq_mhz: 100
-    measured: '2026-09-08'
-    gen_digest: sha256:b7bebff799716c83
+    measured: '2026-09-09'
+    gen_digest: sha256:a450df5a368f41dc
