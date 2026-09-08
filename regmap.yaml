@@ -23,3 +23,10 @@ regs:
     desc: priority threshold per context
     array: { count: contexts, stride: 4096 }
     fields: [ { name: val, bits: "2:0", sw: rw, hw: r, reset: 0 } ]
+
+  - name: claim
+    offset: 0x200004
+    desc: read claims the highest priority pending source, write completes it
+    array: { count: contexts, stride: 4096 }
+    fields:
+      - { name: val, width: 32, sw: rw, hw: w, volatile: true, swacc: true, swmod: true }

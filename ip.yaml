@@ -1,6 +1,6 @@
 name: plic
 version: 0.1.0
-spec: "0.1"
+spec: '0.1'
 kind: ip
 lang: bh
 identity:
@@ -8,26 +8,49 @@ identity:
   display_name: Platform interrupt controller
   summary: PLIC and APLIC from one priority tree, selected by mode.
   category: peripheral
-  subcategories: [interrupt]
+  subcategories:
+  - interrupt
   ip_family: plic
-  integration_profile: [apb4-slave]
+  integration_profile:
+  - apb4-slave
   maturity: planned
 contract:
   version: 1
-  ctrl: { shape: flat, aw: 24, dw: 32 }
-  irq: [ { name: eip, kind: level } ]
+  ctrl:
+    shape: flat
+    aw: 24
+    dw: 32
+  irq:
+  - name: eip
+    kind: level
+    width: contexts
 params:
-  sources: { type: int, default: 32, range: [1, 128] }
-  contexts: { type: int, default: 2, range: [1, 16] }
-features:
-  mode:
-    type: choice
-    values: [plic, aplic-direct, aplic-msi]
-    default: plic
+  sources:
+    type: int
+    default: 32
+    range:
+    - 1
+    - 128
+  contexts:
+    type: int
+    default: 2
+    range:
+    - 1
+    - 16
 emit:
-  - kind: bsv
-    package: Plic
-    module: mkPlic
-    config_type: PlicCfg
-    interface: PlicIfc
-deps: { hwcore: "^0.1" }
+- kind: bsv
+  package: Plic
+  module: mkPlic
+  config_type: PlicCfg
+  interface: PlicIfc
+  ctrl: regs
+  pins:
+  - name: pins
+    type: PlicPins
+    targs:
+    - sources
+- kind: verilog-flat
+  bus: apb4
+deps:
+  hwcore: ^0.1
+  amba: ^0.1
