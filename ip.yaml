@@ -30,7 +30,11 @@ params:
     default: 32
     range:
     - 1
-    - 128
+    - 32
+    desc: >-
+      中断源数。上限 32 是寄存器图定的——pending 与 enable 各只有一个 32 位字。
+      要撑到 PLIC 规范的 1023 源，得把这两个寄存器改成多字数组，
+      那是软件可见的接口变更，不是实现里补一刀能了的。
   contexts:
     type: int
     default: 2
