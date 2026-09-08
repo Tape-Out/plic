@@ -37,15 +37,18 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   // 所以软件写回时不必把值取出来——必然是这一个。
   Vector#(contexts, Reg#(Bit#(32))) taken <- replicateM(mkConfigReg(0));
 
-  // 仲裁结果留一份影子。驱动 volatile 的规则必须排在总线方法之前，
-  // 读软件脉冲的规则必须排在之后，同一条规则要不到这两件事——
-  // 中间用 ConfigReg 转手，读它不带次序要求（D39 那条老经验）。
-  Vector#(contexts, Reg#(Bit#(32))) best <- replicateM(mkConfigReg(0));
-
-  Reg#(Bool) rdPend <- mkReg(False);
-  Reg#(Bool) wrPend <- mkReg(False);
-  Reg#(Bit#(TLog#(TAdd#(contexts, 1)))) rdIdx <- mkReg(0);
-  Reg#(Bit#(TLog#(TAdd#(contexts, 1)))) wrIdx <- mkReg(0);
+  // 仲裁结果留一份同拍可读的影子。驱动 volatile 的规则要排在总线方法之前，
+  // 读软件脉冲的规则要排在之后——用 DWire 转手，次序就是
+  // 「publish -> 总线方法 -> apply」，一条直线，没有环。
+  //
+  // 用 ConfigReg 转手也不成环，但那样在途标记要两拍才生效，中间那一拍
+  // 同一个源会被领第二次。DWire 把窗口压到一拍：本拍发出去的号，
+  // 下一拍的仲裁就看不见了。
+  Vector#(contexts, Wire#(Bit#(32))) best <- replicateM(mkDWire(0));
+  // 中断线打一拍。直接从 best 那根线上出的话，凡是「既驱动 src 又读 eip」的
+  // 规则都会与 publish 成环，publish 被丢掉——而组合直通 src 到中断输出
+  // 对时序也不是好事。
+  Vector#(contexts, Reg#(Bool)) eipR <- replicateM(mkReg(False));
 
   function Vector#(contexts, Bit#(32)) arbitrate(Bit#(32) pend);
     Vector#(contexts, Bit#(32)) o = newVector;
@@ -67,26 +70,22 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
     let b = arbitrate(pend);
     r.pending_in(pend);
     r.claim_in(b);
-    writeVReg(best, b);
-  endrule
-
-  rule mark;
-    rdPend <= r.claim_rd;
-    wrPend <= r.claim_wr;
-    rdIdx  <= r.claim_rd_i;
-    wrIdx  <= r.claim_wr_i;
+    for (Integer c = 0; c < valueOf(contexts); c = c + 1) begin
+      best[c] <= b[c];
+      eipR[c] <= b[c] != 0;
+    end
   endrule
 
   // 读走即在途，写回即放行。两件事写同一个寄存器，合在一条规则里定序。
-  rule apply (rdPend || wrPend);
-    if (rdPend) begin
-      let id = best[rdIdx];
+  rule apply (r.claim_rd || r.claim_wr);
+    if (r.claim_rd) begin
+      let id = best[r.claim_rd_i];
       if (id != 0) begin
         inflight <= inflight | (32'h1 << (id - 1));
-        taken[rdIdx] <= id;
+        taken[r.claim_rd_i] <= id;
       end
     end else begin
-      let id = taken[wrIdx];
+      let id = taken[r.claim_wr_i];
       if (id != 0) inflight <= inflight & ~(32'h1 << (id - 1));
     end
   endrule
@@ -98,7 +97,7 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   method Bit#(contexts) eip;
     Bit#(contexts) o = 0;
     for (Integer c = 0; c < valueOf(contexts); c = c + 1)
-      if (best[c] != 0) o[c] = 1;
+      if (eipR[c]) o[c] = 1;
     return o;
   endmethod
 endmodule
