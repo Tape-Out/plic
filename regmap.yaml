@@ -1,0 +1,25 @@
+ip: plic
+contract: { aw: 24, dw: 32 }
+base: 0x0C000000
+size: 0x400000
+params: [sources, contexts]
+regs:
+  - name: prio
+    offset: 0x000004
+    desc: priority per source
+    array: { count: sources, stride: 4 }
+    fields: [ { name: val, bits: "2:0", sw: rw, hw: r, reset: 0 } ]
+  - name: pending
+    offset: 0x001000
+    desc: pending bits, driven by hardware
+    fields: [ { name: val, width: 32, sw: r, hw: w, volatile: true } ]
+  - name: enable
+    offset: 0x002000
+    desc: enable bits per context
+    array: { count: contexts, stride: 128 }
+    fields: [ { name: val, width: 32, sw: rw, hw: r, reset: 0 } ]
+  - name: thresh
+    offset: 0x200000
+    desc: priority threshold per context
+    array: { count: contexts, stride: 4096 }
+    fields: [ { name: val, bits: "2:0", sw: rw, hw: r, reset: 0 } ]

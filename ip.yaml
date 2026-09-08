@@ -1,0 +1,33 @@
+name: plic
+version: 0.1.0
+spec: "0.1"
+kind: ip
+lang: bh
+identity:
+  slug: plic-tapeout-bsv
+  display_name: Platform interrupt controller
+  summary: PLIC and APLIC from one priority tree, selected by mode.
+  category: peripheral
+  subcategories: [interrupt]
+  ip_family: plic
+  integration_profile: [apb4-slave]
+  maturity: planned
+contract:
+  version: 1
+  ctrl: { shape: flat, aw: 24, dw: 32 }
+  irq: [ { name: eip, kind: level } ]
+params:
+  sources: { type: int, default: 32, range: [1, 128] }
+  contexts: { type: int, default: 2, range: [1, 16] }
+features:
+  mode:
+    type: choice
+    values: [plic, aplic-direct, aplic-msi]
+    default: plic
+emit:
+  - kind: bsv
+    package: Plic
+    module: mkPlic
+    config_type: PlicCfg
+    interface: PlicIfc
+deps: { hwcore: "^0.1" }
