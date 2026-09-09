@@ -59,10 +59,10 @@ deps:
 area:
   base:
     points:
-      '4': 1634.36
-      '8': 2252.88
-      '16': 3468.64
-      '32': 6028.96
+      '4': 1549.8
+      '8': 2117.92
+      '16': 3476.2
+      '32': 5783.4
     per: sources
   margin: 0.0241
   model: points-additive
@@ -75,19 +75,47 @@ area:
   measured:
   - at:
       sources: 4
-    um2: 1634.36
+      contexts: 2
+    um2: 1549.8
   - at:
       sources: 8
-    um2: 2252.88
+      contexts: 2
+    um2: 2117.92
   - at:
       sources: 16
-    um2: 3468.64
+      contexts: 2
+    um2: 3476.2
   - at:
       sources: 32
-    um2: 6028.96
+      contexts: 2
+    um2: 5783.4
+  - at:
+      sources: 32
+      contexts: 1
+    um2: 3825.92
+  - at:
+      sources: 32
+      contexts: 4
+    um2: 8983.24
+  - at:
+      sources: 32
+      contexts: 8
+    um2: 15223.04
+  - at:
+      sources: 32
+      contexts: 16
+    um2: 29357.72
   corner:
     tool: ecc
     pdk: ics55
     freq_mhz: 100
     measured: '2026-09-09'
-    gen_digest: sha256:a450df5a368f41dc
+    gen_digest: sha256:e9efc6266b3228b7
+  params:
+    contexts:
+      points:
+        '1': -1957.48
+        '2': 0.0
+        '4': 3199.84
+        '8': 9439.64
+        '16': 23574.32

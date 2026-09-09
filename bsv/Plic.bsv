@@ -33,9 +33,6 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   Wire#(Bit#(sources)) srcIn <- mkBypassWire;
   // 领走还没做完的源要屏蔽掉，否则同一个中断会被反复领
   Reg#(Bit#(32)) inflight <- mkConfigReg(0);
-  // 每个上下文最近领走的编号。按协议一个上下文同时只有一个在手，
-  // 所以软件写回时不必把值取出来——必然是这一个。
-  Vector#(contexts, Reg#(Bit#(32))) taken <- replicateM(mkConfigReg(0));
 
   // 仲裁结果留一份同拍可读的影子。驱动 volatile 的规则要排在总线方法之前，
   // 读软件脉冲的规则要排在之后——用 DWire 转手，次序就是
@@ -77,16 +74,23 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   endrule
 
   // 读走即在途，写回即放行。两件事写同一个寄存器，合在一条规则里定序。
+  //
+  // 放行的是**软件写回来的那个源号**，不是「这个上下文最近领走的那个」。
+  // 规范允许一个上下文在做完之前再领一次（高优先级抢占就是这么用的），
+  // 那时手上同时有两个，认「最近」就会把还没做完的那个放回去。
+  // 认不出来的号一律忽略，规范也是这么写的。
   rule apply (r.claim_rd || r.claim_wr);
     if (r.claim_rd) begin
       let id = best[r.claim_rd_i];
-      if (id != 0) begin
-        inflight <= inflight | (32'h1 << (id - 1));
-        taken[r.claim_rd_i] <= id;
-      end
+      if (id != 0) inflight <= inflight | (32'h1 << (id - 1));
     end else begin
-      let id = taken[r.claim_wr_i];
-      if (id != 0) inflight <= inflight & ~(32'h1 << (id - 1));
+      Bit#(32) id = r.claim_wr_val;
+      // 还要求这个源对写回的那个上下文是使能的。规范说得明白：认不出来的
+      // 完成一律静默忽略，免得一个上下文替别人把中断放回去。
+      Bool ok = id != 0 && id <= fromInteger(valueOf(sources))
+                && inflight[id - 1] == 1
+                && r.enable[r.claim_wr_i][id - 1] == 1;
+      if (ok) inflight <= inflight & ~(32'h1 << (id - 1));
     end
   endrule
 

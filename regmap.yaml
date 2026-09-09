@@ -29,4 +29,4 @@ regs:
     desc: read claims the highest priority pending source, write completes it
     array: { count: contexts, stride: 4096 }
     fields:
-      - { name: val, width: 32, sw: rw, hw: w, volatile: true, swacc: true, swmod: true }
+      - { name: val, width: 32, sw: rw, hw: w, volatile: true, swacc: true, swmod: true, wrdata: true }
