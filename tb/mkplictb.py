@@ -37,6 +37,7 @@ prio = NL.join([
 
 txt = f'''package Plic{label}Tb;
 
+import ConfigReg::*;
 import RegIf::*;
 import Plic::*;
 
@@ -51,7 +52,7 @@ Bit#(24) rTHRESH = 24'h200000;
 Bit#(24) rCLAIM  = 24'h200004;
 
 typedef enum {{ Cfg, Idle, Fire, Claim, Gap1, Recheck, Complete, Gap2,
-               Reclaim, Done }}
+               Reclaim, Free, ThrSet, ThrGap, ThrChk, Done }}
   Phase deriving (Bits, Eq);
 
 (* synthesize *)
@@ -64,10 +65,17 @@ module mkPlic{label}Tb(Empty);
   Reg#(Bool)     bad <- mkReg(False);
   Reg#(Bit#({nsrc})) src <- mkReg(0);
   Reg#(Bool)     sawEip <- mkReg(False);
+  // 普通寄存器不行：读它的规则会被钉在写它的 pins 之前，而 pins 驱动 src、
+  // src 又是仲裁的输入，绕回来就成环，仲裁整条被丢掉（表现是 claim 恒为 0）。
+  Reg#(Bool)     eipNow <- mkConfigReg(False);
+  Reg#(Bit#(8))  g3 <- mkReg(0);
 
   rule pins;
     p.pins.src(src);
     if (p.eip[0] == 1) sawEip <= True;
+    // 通知线只在这条规则里读。别处再碰它就跟驱动 src 那条成环，
+    // bsc 会把仲裁整条丢掉，表现成超时而不是报错。
+    eipNow <= p.eip[0] == 1;
   endrule
 
   rule timeout;
@@ -150,6 +158,38 @@ module mkPlic{label}Tb(Empty);
     Bool wrong = False;
     if (x.rdata != {first}) begin
       $display("FAIL after completing, claim gave %0d, want {first} again", x.rdata);
+      wrong = True;
+    end
+    if (wrong) bad <= True;
+    ph <= Free;
+  endrule
+
+  // 规范：claim 不受阈值影响，阈值只屏蔽**通知**。它还专门举了
+  // 「把阈值拉满、改用轮询 claim」这个用法，所以这一条不是可有可无的。
+  rule freeIt (ph == Free);
+    wr(rCLAIM, {first});          // 先放回去，好让它重新变成待决
+    ph <= ThrSet;
+  endrule
+
+  rule thrSet (ph == ThrSet);
+    wr(rTHRESH, 7);               // 阈值拉满：通知该没了
+    ph <= ThrGap;
+  endrule
+
+  rule thrGap (ph == ThrGap);
+    if (g3 > 8) ph <= ThrChk; else g3 <= g3 + 1;
+  endrule
+
+  rule thrChk (ph == ThrChk);
+    let x <- p.regs.access(RegReq {{ addr: rCLAIM, write: False,
+                                    wdata: 0, wstrb: 4'hF }});
+    Bool wrong = False;
+    if (x.rdata != {first}) begin
+      $display("FAIL claim gave %0d under a full threshold, want {first}", x.rdata);
+      wrong = True;
+    end
+    if (eipNow) begin
+      $display("FAIL notification still asserted under a full threshold");
       wrong = True;
     end
     if (wrong) bad <= True;

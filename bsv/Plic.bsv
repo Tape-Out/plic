@@ -50,17 +50,23 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   // 对时序也不是好事。
   Vector#(contexts, Reg#(Bool)) eipR <- replicateM(mkReg(False));
 
-  function Vector#(contexts, Bit#(32)) arbitrate(Bit#(32) pend);
-    Vector#(contexts, Bit#(32)) o = newVector;
+  // 仲裁只按优先级，**不看阈值**——规范写明「claim 不受阈值影响」，
+  // 还专门举了「把阈值拉满、改用轮询 claim」这个用法。阈值只挡通知。
+  //
+  // 优先级 0 是「永不中断」，所以起点是 0 而不是阈值。
+  // 同优先级平局按编号取小：往上扫、只在**严格大于**时替换，先到的编号留住。
+  function Vector#(contexts, Tuple2#(Bit#(32), Bit#(3)))
+           arbitrate(Bit#(32) pend);
+    Vector#(contexts, Tuple2#(Bit#(32), Bit#(3))) o = newVector;
     for (Integer c = 0; c < valueOf(contexts); c = c + 1) begin
       Bit#(32) win = 0;
-      Bit#(3)  top = r.thresh[c];
+      Bit#(3)  top = 0;
       for (Integer s = 0; s < valueOf(sources); s = s + 1)
         if (pend[s] == 1 && r.enable[c][s] == 1 && r.prio[s] > top) begin
           top = r.prio[s];
           win = fromInteger(s + 1);   // PLIC 的 0 号不是源，编号从 1 起
         end
-      o[c] = win;
+      o[c] = tuple2(win, top);
     end
     return o;
   endfunction
@@ -68,11 +74,14 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   rule publish;
     Bit#(32) pend = zeroExtend(srcIn) & ~inflight;
     let b = arbitrate(pend);
+    Vector#(contexts, Bit#(32)) ids = map(tpl_1, b);
     r.pending_in(pend);
-    r.claim_in(b);
+    r.claim_in(ids);
     for (Integer c = 0; c < valueOf(contexts); c = c + 1) begin
-      best[c] <= b[c];
-      eipR[c] <= b[c] != 0;
+      best[c] <= tpl_1(b[c]);
+      // 通知才看阈值：「屏蔽优先级小于等于阈值的中断」。赢家都过不了阈值，
+      // 比它低的更过不了，所以判赢家一个就够。
+      eipR[c] <= tpl_1(b[c]) != 0 && tpl_2(b[c]) > r.thresh[c];
     end
   endrule
 
