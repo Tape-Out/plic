@@ -31,8 +31,8 @@ params:
     range:
     - 1
     - 32
-    desc: 中断源数。上限 32 是寄存器图定的——pending 与 enable 各只有一个 32 位字。 要撑到 PLIC 规范的 1023 源，得把这两个寄存器改成多字数组，
-      那是软件可见的接口变更，不是实现里补一刀能了的。
+    desc: 中断源数。上限 32 是寄存器图定的——pending 与 enable 各只有一个 32 位字。 要撑到 PLIC 规范的 1023 
+      源，得把这两个寄存器改成多字数组， 那是软件可见的接口变更，不是实现里补一刀能了的。
   contexts:
     type: int
     default: 2
@@ -59,63 +59,64 @@ deps:
 area:
   base:
     points:
-      '4': 2030.56
-      '8': 3020.64
-      '16': 3930.08
-      '32': 6687.24
+      '4': 2745.96
+      '8': 3955.28
+      '16': 6108.2
+      '32': 8683.92
     per: sources
   margin: 0.0241
   model: points-additive
   error:
     bound: 0.104
     sign: over
-    note: parameter curves stored as measured points, features added on top, then
-      lifted by 0.0241 so that no untested combination predicts under; the worst came
-      in 1.91 percent under before the lift
+    note: parameter curves stored as measured points, features added on top, 
+      then lifted by 0.0241 so that no untested combination predicts under; the 
+      worst came in 1.91 percent under before the lift
   measured:
   - at:
       sources: 4
       contexts: 2
-    um2: 2030.56
+    um2: 2745.96
   - at:
       sources: 8
       contexts: 2
-    um2: 3020.64
+    um2: 3955.28
   - at:
       sources: 16
       contexts: 2
-    um2: 3930.08
+    um2: 6108.2
   - at:
       sources: 32
       contexts: 2
-    um2: 6687.24
+    um2: 8683.92
   - at:
       sources: 32
       contexts: 1
-    um2: 4050.76
+    um2: 4760.28
   - at:
       sources: 32
       contexts: 4
-    um2: 11331.6
+    um2: 13933.08
   - at:
       sources: 32
       contexts: 8
-    um2: 19236.56
+    um2: 26390.84
   - at:
       sources: 32
       contexts: 16
-    um2: 39243.96
+    um2: 50511.44
   corner:
     tool: ecc
     pdk: ics55
     freq_mhz: 100
-    measured: '2026-09-09'
-    gen_digest: sha256:68b610a3561dc639
+    measured: '2026-09-11'
+    toolchain: bsc 2026.01 · yosys 0.68+195 · ecc 0.1.0a11
+    gen_digest: sha256:e6c00aaa23d480a8
   params:
     contexts:
       points:
-        '1': -2636.48
+        '1': -3923.64
         '2': 0.0
-        '4': 4644.36
-        '8': 12549.32
-        '16': 32556.72
+        '4': 5249.16
+        '8': 17706.92
+        '16': 41827.52

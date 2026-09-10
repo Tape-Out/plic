@@ -9,15 +9,21 @@ regs:
     desc: priority per source
     array: { count: sources, stride: 4 }
     fields: [ { name: val, bits: "2:0", sw: rw, hw: r, reset: 0 } ]
+  # 手册 10.4：待决位按**中断号**排，第 0 位代表并不存在的 0 号源、硬连为零。
+  # 引脚 s 是中断号 s+1，所以 32 个源要用到第 32 位——一个字装不下，
+  # 规范本来也是「2 个 32 位字」。
   - name: pending
     offset: 0x001000
-    desc: pending bits, driven by hardware
-    fields: [ { name: val, width: 32, sw: r, hw: w, volatile: true } ]
+    desc: pending bits, driven by hardware, indexed by interrupt id
+    width: 64
+    fields: [ { name: val, width: 64, sw: r, hw: w, volatile: true } ]
+  # 手册 10.5：使能位与待决位排法相同，第 0 位同样是那个不存在的源
   - name: enable
     offset: 0x002000
-    desc: enable bits per context
+    desc: enable bits per context, indexed by interrupt id
     array: { count: contexts, stride: 128 }
-    fields: [ { name: val, width: 32, sw: rw, hw: r, reset: 0 } ]
+    width: 64
+    fields: [ { name: val, width: 64, sw: rw, hw: r, reset: 0 } ]
   - name: thresh
     offset: 0x200000
     desc: priority threshold per context

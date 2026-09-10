@@ -23,7 +23,9 @@ NL = chr(10)
 lo = 0
 hi = min(nsrc - 1, 5)
 pair = nsrc >= 2
-mask = (1 << lo) | (1 << hi) if pair else 1
+# 两个空间别混：src 是**引脚**位图，使能是**中断号**位图，引脚 s 是中断号 s+1
+srcmask = (1 << lo) | (1 << hi) if pair else 1
+mask = (srcmask << 1)
 # 领取交出去的是从 1 起编的源号
 first = (hi + 1) if pair else 1
 second = (lo + 1) if pair else 0
@@ -51,7 +53,8 @@ Bit#(24) rEN0    = 24'h002000;
 Bit#(24) rTHRESH = 24'h200000;
 Bit#(24) rCLAIM  = 24'h200004;
 
-typedef enum {{ Cfg, Idle, Fire, Claim, Gap1, Recheck, Complete, Gap2,
+typedef enum {{ Ids, IdsChk, IdsEnd,
+               Cfg, Idle, Fire, Claim, Gap1, Recheck, Complete, Gap2,
                Reclaim, Free, ThrSet, ThrGap, ThrChk, Done }}
   Phase deriving (Bits, Eq);
 
@@ -59,7 +62,7 @@ typedef enum {{ Cfg, Idle, Fire, Claim, Gap1, Recheck, Complete, Gap2,
 module mkPlic{label}Tb(Empty);
   PlicIfc#(24, 32, {nsrc}, {nctx}) p <- mkPlic(PlicCfg {{ none: ? }});
 
-  Reg#(Phase)    ph  <- mkReg(Cfg);
+  Reg#(Phase)    ph  <- mkReg(Ids);
   Reg#(Bit#(8))  s   <- mkReg(0);
   Reg#(Bit#(32)) cyc <- mkReg(0);
   Reg#(Bool)     bad <- mkReg(False);
@@ -69,6 +72,7 @@ module mkPlic{label}Tb(Empty);
   // src 又是仲裁的输入，绕回来就成环，仲裁整条被丢掉（表现是 claim 恒为 0）。
   Reg#(Bool)     eipNow <- mkConfigReg(False);
   Reg#(Bit#(8))  g3 <- mkReg(0);
+  Reg#(Bit#(32)) pendSeen <- mkReg(0);
 
   rule pins;
     p.pins.src(src);
@@ -91,6 +95,61 @@ module mkPlic{label}Tb(Empty);
                                     wdata: d, wstrb: 4'hF }});
   endaction;
 
+  // 手册 10.4 与 10.5：中断 ID 从 1 起编，位图的第 i 位对应 ID i，而第 0 位
+  // 「代表并不存在的 0 号源，硬连为零」。引脚 0 就是 ID 1，所以按规范使能它
+  // 要写第 **1** 位，待决也该出现在第 1 位上。
+  rule ids (ph == Ids);
+    case (s)
+      0: wr(prioAt(0), 7);            // ID 1 的优先级寄存器在偏移 4
+      1: wr(rEN0, 32'h00000002);      // 按规范使能 ID 1
+      2: wr(rTHRESH, 0);
+      3: src <= 1;                    // 引脚 0 拉高
+      6: action
+           let x <- p.regs.access(RegReq {{ addr: 24'h001000, write: False,
+                                            wdata: 0, wstrb: 4'hF }});
+           pendSeen <= x.rdata;
+         endaction
+      10: ph <= IdsChk;
+      default: noAction;
+    endcase
+    if (s < 10) s <= s + 1; else s <= 0;
+  endrule
+
+  rule idsChk (ph == IdsChk);
+    let x <- p.regs.access(RegReq {{ addr: rCLAIM, write: False,
+                                     wdata: 0, wstrb: 4'hF }});
+    Bool wrong = False;
+    if (x.rdata != 1) begin
+      $display("FAIL enable bit 1 should enable interrupt id 1, claim gave %0d",
+               x.rdata);
+      wrong = True;
+    end
+    if (pendSeen[0] != 0) begin
+      $display("FAIL pending bit 0 is not hardwired to zero: %08h", pendSeen);
+      wrong = True;
+    end
+    if (pendSeen[1] != 1) begin
+      $display("FAIL interrupt id 1 should be pending in bit 1: %08h", pendSeen);
+      wrong = True;
+    end
+    if (wrong) bad <= True;
+    ph <= IdsEnd;
+  endrule
+
+  // 收拾干净，别把在途与使能留给后面的判据
+  rule idsEnd (ph == IdsEnd);
+    case (s)
+      0: wr(rCLAIM, 1);
+      1: wr(rEN0, 0);
+      2: src <= 0;
+      // 转相位要落在计数器归零的那一拍上：下一段的 case 也是从 0 数起，
+      // 带着非零的步数进去，它开头那几步就全被跳过（这一天栽过四次）
+      5: ph <= Cfg;
+      default: noAction;
+    endcase
+    if (s < 5) s <= s + 1; else s <= 0;
+  endrule
+
   rule cfg (ph == Cfg);
     case (s)
 {prio}
@@ -102,7 +161,7 @@ module mkPlic{label}Tb(Empty);
   endrule
 
   rule idle (ph == Idle);
-    src <= {nsrc}'h{mask:X};
+    src <= {nsrc}'h{srcmask:X};
     ph  <= Fire;
   endrule
 
