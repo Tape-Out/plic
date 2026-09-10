@@ -2,7 +2,7 @@ name: plic
 version: 0.1.0
 spec: '0.1'
 kind: ip
-lang: bh
+lang: bsv
 identity:
   slug: plic-tapeout-bsv
   display_name: Platform interrupt controller
