@@ -2,7 +2,9 @@ name: plic
 version: 0.1.0
 spec: '0.1'
 kind: ip
-lang: bsv
+lang:
+- bsv
+- bh
 identity:
   slug: plic-tapeout-bsv
   display_name: Platform interrupt controller
@@ -30,9 +32,9 @@ params:
     default: 32
     range:
     - 1
-    - 32
-    desc: 中断源数。上限 32 是寄存器图定的——pending 与 enable 各只有一个 32 位字。 要撑到 PLIC 规范的 1023 
-      源，得把这两个寄存器改成多字数组， 那是软件可见的接口变更，不是实现里补一刀能了的。
+    - 63
+    desc: 中断源数。待决与使能按中断号排在两个 32 位字里，第 0 位不是源，所以最多 63 个。要撑到 PLIC 规范的 1023 
+      个源得把这两个寄存器改成更多字的数组，那是软件可见的接口变更
   contexts:
     type: int
     default: 2
@@ -59,10 +61,11 @@ deps:
 area:
   base:
     points:
-      '4': 2745.96
-      '8': 3955.28
-      '16': 6108.2
-      '32': 8683.92
+      '4': 3434.76
+      '8': 4041.24
+      '16': 5848.36
+      '32': 8456.84
+      '63': 12750.36
     per: sources
   margin: 0.0241
   model: points-additive
@@ -76,47 +79,51 @@ area:
   - at:
       sources: 4
       contexts: 2
-    um2: 2745.96
+    um2: 3434.76
   - at:
       sources: 8
       contexts: 2
-    um2: 3955.28
+    um2: 4041.24
   - at:
       sources: 16
       contexts: 2
-    um2: 6108.2
+    um2: 5848.36
   - at:
       sources: 32
       contexts: 2
-    um2: 8683.92
+    um2: 8456.84
+  - at:
+      sources: 63
+      contexts: 2
+    um2: 12750.36
   - at:
       sources: 32
       contexts: 1
-    um2: 4760.28
+    um2: 5113.08
   - at:
       sources: 32
       contexts: 4
-    um2: 13933.08
+    um2: 14147.0
   - at:
       sources: 32
       contexts: 8
-    um2: 26390.84
+    um2: 26635.0
   - at:
       sources: 32
       contexts: 16
-    um2: 50511.44
+    um2: 46300.8
   corner:
     tool: ecc
     pdk: ics55
     freq_mhz: 100
-    measured: '2026-09-11'
+    measured: '2026-09-14'
     toolchain: bsc 2026.01 · yosys 0.68+195 · ecc 0.1.0a11
-    gen_digest: sha256:e6c00aaa23d480a8
+    gen_digest: sha256:8211f8eabb3bbc47
   params:
     contexts:
       points:
-        '1': -3923.64
+        '1': -3343.76
         '2': 0.0
-        '4': 5249.16
-        '8': 17706.92
-        '16': 41827.52
+        '4': 5690.16
+        '8': 18178.16
+        '16': 37843.96

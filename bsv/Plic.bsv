@@ -4,6 +4,7 @@ import Vector::*;
 import ConfigReg::*;
 import RegIf::*;
 import PlicRegs::*;
+import Prio::*;
 
 // 本包不认识任何总线：对外只给中立的 RegIf，接哪种总线由 wrap 或装配决定。
 // 本版只做 PLIC 本体：AIA 的 APLIC 与 IMSIC 是另一套寄存器布局，住在 imsic 仓。
@@ -23,9 +24,10 @@ interface PlicIfc#(numeric type aw, numeric type dw,
   (* always_ready *) method Bit#(contexts) eip;
 endinterface
 
+// 源数上限 63：待决与使能按中断号排在两个 32 位字里，第 0 位不是源（手册 10.4）
 module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
     provisos (Mul#(TDiv#(dw, 8), 8, dw), Add#(_a, 24, aw), Add#(_b, 3, dw),
-              Add#(_c, 32, dw), Add#(_d, sources, 32),
+              Add#(_c, 32, dw), Add#(_d, sources, 63),
               Add#(_e, TLog#(TAdd#(contexts, 1)), 24),
               Add#(_f, sources, 64));
 
@@ -62,22 +64,15 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
   // 仲裁只按优先级，**不看阈值**——规范写明「claim 不受阈值影响」，
   // 还专门举了「把阈值拉满、改用轮询 claim」这个用法。阈值只挡通知。
   //
-  // 优先级 0 是「永不中断」，所以起点是 0 而不是阈值。
-  // 同优先级平局按编号取小：往上扫、只在**严格大于**时替换，先到的编号留住。
+  // 折叠本身在 Prio.bs：起点为 0（优先级 0 永不中断），平局取编号小。
   function Vector#(contexts, Tuple2#(Bit#(32), Bit#(3)))
            arbitrate(Bit#(64) pend);
-    Vector#(contexts, Tuple2#(Bit#(32), Bit#(3))) o = newVector;
-    for (Integer c = 0; c < valueOf(contexts); c = c + 1) begin
-      Bit#(32) win = 0;
-      Bit#(3)  top = 0;
-      for (Integer s = 0; s < valueOf(sources); s = s + 1)
-        if (pend[s + 1] == 1 && r.enable[c][s + 1] == 1 && r.prio[s] > top) begin
-          top = r.prio[s];
-          win = fromInteger(s + 1);   // PLIC 的 0 号不是源，编号从 1 起
-        end
-      o[c] = tuple2(win, top);
-    end
-    return o;
+    function Tuple2#(Bit#(32), Bit#(3)) ctx(Integer c);
+      // 位图按中断号排，引脚 s 是 s+1 号
+      function Bool live(Integer s) = pend[s + 1] == 1 && r.enable[c][s + 1] == 1;
+      return highest(genWith(live), r.prio);
+    endfunction
+    return genWith(ctx);
   endfunction
 
   rule publish;

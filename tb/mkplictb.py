@@ -6,6 +6,8 @@
 认矩阵：`sources` 决定挑哪两个源来比优先级——原来写死源 2 与源 5，源数少于 6 的
 那些点根本没测到自己那一份。只有一个源时比不了优先级，改验「领走之后在途、
 放回去又能领」这一条，别拿同一个源冒充两个。`contexts` 决定 eip 的宽度。
+最后一段验平局：两个源同优先级时领到编号小的那个。原来只比过优先级不同的一对，
+「严格大于才替换」写成「大于等于」也照样全绿。
 """
 import json
 import pathlib
@@ -55,7 +57,7 @@ Bit#(24) rCLAIM  = 24'h200004;
 
 typedef enum {{ Ids, IdsChk, IdsEnd,
                Cfg, Idle, Fire, Claim, Gap1, Recheck, Complete, Gap2,
-               Reclaim, Free, ThrSet, ThrGap, ThrChk, Done }}
+               Reclaim, Free, ThrSet, ThrGap, ThrChk, TieSet, TieChk, Done }}
   Phase deriving (Bits, Eq);
 
 (* synthesize *)
@@ -73,6 +75,8 @@ module mkPlic{label}Tb(Empty);
   Reg#(Bool)     eipNow <- mkConfigReg(False);
   Reg#(Bit#(8))  g3 <- mkReg(0);
   Reg#(Bit#(32)) pendSeen <- mkReg(0);
+  // 平局那一段自带计数器：s 在 cfg 之后一直累加，带着非零的步数进去会跳步
+  Reg#(Bit#(8))  g4 <- mkReg(0);
 
   rule pins;
     p.pins.src(src);
@@ -252,6 +256,27 @@ module mkPlic{label}Tb(Empty);
       wrong = True;
     end
     if (wrong) bad <= True;
+    ph <= {"TieSet" if pair else "Done"};
+  endrule
+
+  // 手上两个都做完，再把高编号那个的优先级降到与低编号相同，然后领一次
+  rule tieSet (ph == TieSet);
+    case (g4)
+      0: wr(rCLAIM, {first});
+      1: wr(rCLAIM, {second});
+      2: wr(prioAt({hi}), 1);
+      default: noAction;
+    endcase
+    if (g4 > 10) ph <= TieChk; else g4 <= g4 + 1;
+  endrule
+
+  rule tieChk (ph == TieChk);
+    let x <- p.regs.access(RegReq {{ addr: rCLAIM, write: False,
+                                    wdata: 0, wstrb: 4'hF }});
+    if (x.rdata != {second}) begin
+      $display("FAIL two sources share a priority and claim gave %0d, want the lower id {second}", x.rdata);
+      bad <= True;
+    end
     ph <= Done;
   endrule
 
@@ -261,7 +286,7 @@ module mkPlic{label}Tb(Empty);
       bad <= True;
     end
     if (bad || !sawEip) $display("FAILED");
-    else $display("PASS plic: priority, claim, in flight masking, complete");
+    else $display("PASS plic: priority, ties to the lower id, claim, in flight masking, complete");
     $finish((bad || !sawEip) ? 1 : 0);
   endrule
 endmodule

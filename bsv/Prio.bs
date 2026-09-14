@@ -1,0 +1,17 @@
+package Prio where
+
+-- 在一组候选里挑优先级最高的那一个，返回（编号，优先级）。编号从 1 起，0 表示没有赢家。
+--
+-- 写成 BH：这是一次对候选的折叠，不牵涉哪条规则先跑、这一拍读到新值还是旧值。
+-- 在 BSV 里它是两个可变累加变量套一层 for，换成 foldl 就是一行方程。
+--
+-- 平局取编号小的（PLIC 规范 10.3：interrupts with the lowest ID have the highest
+-- effective priority）：只在严格大于时替换，先到的留住。优先级 0 从不胜出，因为
+-- 起点就是 0。imsic 里的 APLIC 仲裁同形，拆出来是为了让它也能用。
+
+import Vector
+
+highest :: Vector n Bool -> Vector n (Bit p) -> (Bit 32, Bit p)
+highest live prio =
+  let step (w, t) (l, q, i) = if l && q > t then (fromInteger (i + 1), q) else (w, t)
+  in  foldl step (0, 0) (zip3 live prio genVector)
