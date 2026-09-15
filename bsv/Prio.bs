@@ -2,16 +2,20 @@ package Prio where
 
 -- 在一组候选里挑优先级最高的那一个，返回（编号，优先级）。编号从 1 起，0 表示没有赢家。
 --
--- 写成 BH：这是一次对候选的折叠，不牵涉哪条规则先跑、这一拍读到新值还是旧值。
--- 在 BSV 里它是两个可变累加变量套一层 for，换成 foldl 就是一行方程。
+-- 写成 BH：这是一次对候选的归约，不牵涉哪条规则先跑、这一拍读到新值还是旧值。
+-- 用平衡树的 fold 而不是 foldl：foldl 是一条 n 级的比较链，63 个源就是 63 级；
+-- fold 两两归约，只有 log2 n 级。能这样换，是因为「取优先级大的，一样大取左边的」满足结合律，
+-- 而 fold 两两配对时保持左右次序。
 --
 -- 平局取编号小的（PLIC 规范 10.3：interrupts with the lowest ID have the highest
--- effective priority）：只在严格大于时替换，先到的留住。优先级 0 从不胜出，因为
--- 起点就是 0。imsic 里的 APLIC 仲裁同形，拆出来是为了让它也能用。
+-- effective priority）：右边严格大于才换，左边编号小，留住左边。没使能的候选当成优先级 0、
+-- 编号 0，优先级 0 从不胜出。imsic 里的 APLIC 仲裁同形，拆出来是为了让它也能用。
 
 import Vector
 
-highest :: Vector n Bool -> Vector n (Bit p) -> (Bit 32, Bit p)
+highest :: (Add 1 k n) => Vector n Bool -> Vector n (Bit p) -> (Bit 32, Bit p)
 highest live prio =
-  let step (w, t) (l, q, i) = if l && q > t then (fromInteger (i + 1), q) else (w, t)
-  in  foldl step (0, 0) (zip3 live prio genVector)
+  let cand l q i = if l && q > 0 then (q, fromInteger (i + 1)) else (0, 0)
+      better a b = if tpl_1 b > tpl_1 a then b else a
+      win = fold better (zipWith3 cand live prio genVector)
+  in  (tpl_2 win, tpl_1 win)

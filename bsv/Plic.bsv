@@ -29,7 +29,7 @@ module mkPlic#(PlicCfg cfg)(PlicIfc#(aw, dw, sources, contexts))
     provisos (Mul#(TDiv#(dw, 8), 8, dw), Add#(_a, 24, aw), Add#(_b, 3, dw),
               Add#(_c, 32, dw), Add#(_d, sources, 63),
               Add#(_e, TLog#(TAdd#(contexts, 1)), 24),
-              Add#(_f, sources, 64));
+              Add#(_f, sources, 64), Add#(1, _g, sources));
 
   PlicRegsIfc#(aw, dw, sources, contexts) r <- mkPlicRegs;
 
