@@ -45,7 +45,7 @@ import ConfigReg::*;
 import RegIf::*;
 import Plic::*;
 
-// 由 tb/mkplictb.py 生成，勿手改。
+// 由 htest/mkplictb.py 生成，勿手改。
 // 这一点：sources={nsrc} contexts={nctx}，比的是源 {lo} 与源 {hi}
 
 // 偏移照 regmap.yaml：优先级每源 4 字节从 4 起，使能每上下文 128 字节，
